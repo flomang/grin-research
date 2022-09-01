@@ -1,3 +1,3 @@
-* Grin-Explorer
+## Grin-Research
 
 Blockchain explorer for grin.
