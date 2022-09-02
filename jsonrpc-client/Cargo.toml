@@ -1,5 +1,5 @@
 [package]
-name = "api"
+name = "jsonrpc-client"
 version = "0.1.0"
 edition = "2021"
 
@@ -9,8 +9,8 @@ path = "src/lib.rs"
 
 # needed for vscode debug
 [[bin]]
-name = "main"
-path = "src/main.rs"
+name = "grin_api"
+path = "src/examples/grin_api.rs"
 
 [dependencies]
 actix = "0.13.0"
