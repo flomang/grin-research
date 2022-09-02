@@ -2,43 +2,41 @@ use easy_jsonrpc_mw::{BoundMethod, Response};
 use reqwest::Client;
 use serde::Deserialize;
 use serde_json::Value;
-use std::net::SocketAddr;
-use std::fmt;
 
 pub fn rpc<R: Deserialize<'static>>(
-    addr: &SocketAddr,
+    url: &str,
     method: &BoundMethod<'_, R>,
 ) -> Result<R, RpcErr> {
     let (request, tracker) = method.call();
-    let json_response = post(addr, &request.as_request())?;
+    let json_response = post(url, &request.as_request())?;
     let mut response = Response::from_json_response(json_response)?;
     Ok(tracker.get_return(&mut response)?)
 }
 
 pub async fn rpc_async<R: Deserialize<'static>>(
-    addr: &SocketAddr,
+    url: &str,
     method: &BoundMethod<'_, R>,
 ) -> Result<R, RpcErr> {
     let (request, tracker) = method.call();
-    let json_response = post_async(addr, &request.as_request()).await?;
+    let json_response = post_async(url, &request.as_request()).await?;
     let mut response = Response::from_json_response(json_response)?;
     Ok(tracker.get_return(&mut response)?)
 }
 
-fn post(addr: &SocketAddr, body: &Value) -> Result<Value, reqwest::Error> {
+fn post(url: &str, body: &Value) -> Result<Value, reqwest::Error> {
     let client = reqwest::blocking::Client::new();
     client
-        .post(&format!("http://{}/v2/foreign", addr))
+        .post(url)
         .json(body)
         .send()?
         .error_for_status()?
         .json()
 }
 
-async fn post_async(addr: &SocketAddr, body: &Value) -> Result<Value, reqwest::Error> {
+async fn post_async(url: &str, body: &Value) -> Result<Value, reqwest::Error> {
     let client = Client::new();
     let response = client
-        .post(&format!("http://{}/v2/foreign", addr))
+        .post(url)
         .json(body)
         .send()
         .await?;
@@ -73,8 +71,8 @@ impl From<reqwest::Error> for RpcErr {
     }
 }
 
-impl fmt::Display for RpcErr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl std::fmt::Display for RpcErr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             RpcErr::Http(e) => write!(f, "rpc encountered some http error: {}", e),
             _ => write!(f, "InvalidResponse"),

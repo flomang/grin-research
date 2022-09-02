@@ -29,13 +29,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let args = Args::parse();
     let grin_addr: SocketAddr = args.grin_api_addr.parse().unwrap();
+    let grin_url = format!("http://{}/v2/foreign", grin_addr);
 
     let (tx, rx) = mpsc::channel();
     let tx1 = tx.clone();
     let args1 = args.clone();
 
     thread::spawn(move || {
-        let grin_version = rpc(&grin_addr, &foreign_rpc::get_version().unwrap())
+        let grin_version = rpc(&grin_url, &foreign_rpc::get_version().unwrap())
             .unwrap()
             .unwrap()
             .node_version;
@@ -55,7 +56,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         //let mut all_txns: Vec<PoolEntry> = vec![];
 
         loop {
-            let grin_tip = rpc(&grin_addr, &foreign_rpc::get_tip().unwrap())
+            let grin_tip = rpc(&grin_url, &foreign_rpc::get_tip().unwrap())
                 .unwrap()
                 .unwrap();
 
@@ -63,7 +64,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 current_height = grin_tip.height;
 
                 let block = rpc(
-                    &grin_addr,
+                    &grin_url,
                     &foreign_rpc::get_block(Some(current_height), None, None).unwrap(),
                 )
                 .unwrap()
