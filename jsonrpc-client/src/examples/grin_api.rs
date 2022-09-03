@@ -70,8 +70,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .unwrap()
                         .unwrap();
 
-                        info!("supply: {}", block.header.height * 60 + 60);
-                        info!("height: {}", block.header.height);
+                        let emission = block.header.height * 60 + 60;
+                        info!("height: {}, supply: {}", block.header.height, emission);
                     }
                 }
                 Ok(Err(err)) => {
@@ -110,13 +110,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             let outputs = txn.tx.body.outputs.len();
                             let kernels = txn.tx.body.kernels.len();
 
-                            info!("\ttrans #{}:", i+1);
-                            info!("\tat: {}", txn.tx_at);
-                            info!("\tsrc: {:?}", txn.src);
-                            info!("\tkernels: {:?}", kernels);
-                            info!("\tinputs: {:?}", inputs);
-                            info!("\toutputs: {:?}", outputs);
-                            //info!("\ttx: {:#?}", txn.tx);
+                            info!("trans #{} at: {}", i+1, txn.tx_at);
+                            info!("  src: {:?}", txn.src);
+                            info!("  kernels: {:?}", kernels);
+                            info!("  outputs: {:?}", outputs);
+                            info!("  inputs: {:?}", inputs);
+
+                            match &txn.tx.body.inputs {
+                                grin_core::core::transaction::Inputs::FeaturesAndCommit(vec) => vec.iter().for_each( |f| info!("    commit: {:?}", f.commitment())),
+                                grin_core::core::transaction::Inputs::CommitOnly(vec) => vec.iter().for_each( |f| info!("    commit: {:?}", f.commitment())),
+                            }
+                            info!("\ttx: {:#?}", txn.tx);
                         });
                     }
                 }
