@@ -105,19 +105,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         info!("Unconfirmed transactions ({})", txns.len());
 
                         all_txns = txns;
-                        for txn in all_txns.iter() {
+                        all_txns.iter().enumerate().for_each(|(i, txn)| {
                             let inputs = txn.tx.body.inputs.len();
                             let outputs = txn.tx.body.outputs.len();
                             let kernels = txn.tx.body.kernels.len();
 
-                            info!("-----------");
-                            info!("\t at: {}", txn.tx_at);
-                            info!("\t src: {:?}", txn.src);
-                            info!("\t kernels: {:?}", kernels);
-                            info!("\t inputs: {:?}", inputs);
-                            info!("\t outputs: {:?}", outputs);
-                            info!("\t tx: {:#?}", txn.tx);
-                        }
+                            info!("\ttrans #{}:", i+1);
+                            info!("\tat: {}", txn.tx_at);
+                            info!("\tsrc: {:?}", txn.src);
+                            info!("\tkernels: {:?}", kernels);
+                            info!("\tinputs: {:?}", inputs);
+                            info!("\toutputs: {:?}", outputs);
+                            //info!("\ttx: {:#?}", txn.tx);
+                        });
                     }
                 }
                 Ok(Err(err)) => {
