@@ -1,12 +1,12 @@
 use clap::Parser;
 use grin_api::foreign_rpc::foreign_rpc;
-//use grin_pool::types::PoolEntry;
-use log::info;
+use grin_pool::types::PoolEntry;
+use log::{debug, info, warn};
 use std::net::SocketAddr;
-use std::sync::mpsc;
+//use std::sync::mpsc;
 //use std::time::Duration;
+use api::{rpc, rpc_async};
 use std::{thread, time};
-use api::rpc;
 
 #[derive(Clone, Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -31,80 +31,110 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let grin_addr: SocketAddr = args.grin_api_addr.parse().unwrap();
     let grin_url = format!("http://{}/v2/foreign", grin_addr);
 
-    let (tx, rx) = mpsc::channel();
-    let tx1 = tx.clone();
-    let args1 = args.clone();
+    //let (tx, rx) = mpsc::channel();
+    //let tx1 = tx.clone();
+    //let args1 = args.clone();
 
-    thread::spawn(move || {
-        let grin_version = rpc(&grin_url, &foreign_rpc::get_version().unwrap())
-            .unwrap()
-            .unwrap()
-            .node_version;
+    let grin_version = rpc_async(&grin_url, &foreign_rpc::get_version().unwrap())
+        .await
+        .unwrap()
+        .unwrap()
+        .node_version;
 
-        if args1.grin_api_version != grin_version {
-            panic!(
-                "expected grin version: {} actual running node instance is: {}",
-                args1.grin_api_version, grin_version
-            )
-        }
+    assert!(
+        args.grin_api_version == grin_version,
+        "unexpected grin node version"
+    );
+    info!("grin api: {:?}", grin_version);
 
-        info!("grin api: {:?}", grin_version);
-        tx1.send(grin_version).unwrap();
-
+    let grin_url_copy = grin_url.clone();
+    // block tip thread
+    let handle1 = thread::spawn(move || {
         let mut current_height = 0;
         let delay = time::Duration::from_secs(1);
-        //let mut all_txns: Vec<PoolEntry> = vec![];
 
         loop {
-            let grin_tip = rpc(&grin_url, &foreign_rpc::get_tip().unwrap())
-                .unwrap()
-                .unwrap();
+            debug!("block tip thread");
 
-            if current_height < grin_tip.height {
-                current_height = grin_tip.height;
+            let result = rpc(&grin_url_copy, &foreign_rpc::get_tip().unwrap());
 
-                let block = rpc(
-                    &grin_url,
-                    &foreign_rpc::get_block(Some(current_height), None, None).unwrap(),
-                )
-                .unwrap()
-                .unwrap();
+            match result {
+                Ok(Ok(grin_tip)) => {
+                    if current_height < grin_tip.height {
+                        current_height = grin_tip.height;
 
-                info!("supply: {}", block.header.height * 60 + 60);
-                info!("block tip at: {}", block.header.height);
+                        let block = rpc(
+                            &grin_url_copy,
+                            &foreign_rpc::get_block(Some(current_height), None, None).unwrap(),
+                        )
+                        .unwrap()
+                        .unwrap();
+
+                        info!("supply: {}", block.header.height * 60 + 60);
+                        info!("height: {}", block.header.height);
+                    }
+                }
+                Ok(Err(err)) => {
+                    warn!("encountered error: {}", err);
+                }
+                Err(err) => {
+                    info!("encountered rpc error: {}", err);
+                    break;
+                }
             }
 
-            // if let Ok(txns) = rpc(
-            //     &grin_addr,
-            //     &foreign_rpc::get_unconfirmed_transactions().unwrap(),
-            // )
-            // .unwrap()
-            // {
-
-            //     if all_txns.len() != txns.len() {
-            //         all_txns = txns;
-            //         for txn in all_txns.iter() {
-            //             let inputs = txn.tx.body.inputs.len();
-            //             let outputs = txn.tx.body.outputs.len();
-            //             let kernels = txn.tx.body.kernels.len();
-
-            //             info!("----");
-            //             info!("\t at: {}", txn.tx_at);
-            //             info!("\t src: {:?}", txn.src);
-            //             info!("\t kernels: {:?}", kernels);
-            //             info!("\t inputs: {:?}", inputs);
-            //             info!("\t outputs: {:?}", outputs);
-            //             info!("\t tx: {:?}", txn.tx);
-            //         }
-            //     }
-            // }
             thread::sleep(delay);
         }
     });
 
-    for received in rx {
-        println!("Got: {}", received);
-    }
+    let handle2 = thread::spawn(move || {
+        let delay = time::Duration::from_millis(300);
+        let mut all_txns: Vec<PoolEntry> = vec![];
+
+        loop {
+            debug!("unconfirmed txns thread");
+
+            let result = rpc(
+                &grin_url,
+                &foreign_rpc::get_unconfirmed_transactions().unwrap(),
+            );
+
+            match result {
+                Ok(Ok(txns)) => {
+                    if all_txns.len() != txns.len() {
+                        info!("Unconfirmed transactions ({})", txns.len());
+
+                        all_txns = txns;
+                        for txn in all_txns.iter() {
+                            let inputs = txn.tx.body.inputs.len();
+                            let outputs = txn.tx.body.outputs.len();
+                            let kernels = txn.tx.body.kernels.len();
+
+                            info!("-----------");
+                            info!("\t at: {}", txn.tx_at);
+                            info!("\t src: {:?}", txn.src);
+                            info!("\t kernels: {:?}", kernels);
+                            info!("\t inputs: {:?}", inputs);
+                            info!("\t outputs: {:?}", outputs);
+                            info!("\t tx: {:#?}", txn.tx);
+                        }
+                    }
+                }
+                Ok(Err(err)) => {
+                    warn!("encountered error: {}", err);
+                }
+                Err(err) => {
+                    info!("encountered rpc error: {}", err);
+                    break;
+                }
+            }
+
+            thread::sleep(delay);
+        }
+    });
+
+    handle1.join().unwrap();
+    handle2.join().unwrap();
 
     Ok(())
 }
