@@ -110,17 +110,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             let outputs = txn.tx.body.outputs.len();
                             let kernels = txn.tx.body.kernels.len();
 
-                            info!("trans #{} at: {}", i+1, txn.tx_at);
-                            info!("  src: {:?}", txn.src);
-                            info!("  kernels: {:?}", kernels);
-                            info!("  outputs: {:?}", outputs);
-                            info!("  inputs: {:?}", inputs);
+                            info!("  trans #{}", i+1);
+                            info!("\tat: {}", txn.tx_at);
+                            info!("\tsrc: {:?}", txn.src);
+                            info!("\tkernels: {:?}", kernels);
 
+                            info!("\tinputs: {:?}", inputs);
                             match &txn.tx.body.inputs {
-                                grin_core::core::transaction::Inputs::FeaturesAndCommit(vec) => vec.iter().for_each( |f| info!("    commit: {:?}", f.commitment())),
-                                grin_core::core::transaction::Inputs::CommitOnly(vec) => vec.iter().for_each( |f| info!("    commit: {:?}", f.commitment())),
+                                grin_core::core::transaction::Inputs::FeaturesAndCommit(vec) => vec.iter().for_each( |f| info!("\t  commit: {:?}", f.commitment())),
+                                grin_core::core::transaction::Inputs::CommitOnly(vec) => vec.iter().for_each( |f| info!("\t  commit: {:?}", f.commitment())),
                             }
-                            info!("\ttx: {:#?}", txn.tx);
+
+                            info!("\toutputs: {:?}", outputs);
+                            txn.tx.body.outputs.iter().for_each( |output| {
+                                info!("\t  output: {:?}", output.identifier.commitment());
+                            });
+
+                            //info!("\ttx: {:#?}", txn.tx);
                         });
                     }
                 }
