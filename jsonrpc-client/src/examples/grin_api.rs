@@ -71,7 +71,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .unwrap();
 
                         let emission = block.header.height * 60 + 60;
-                        info!("height: {}, supply: {}", block.header.height, emission);
+                        info!("new block: {}, supply: {}", block.header.height, emission);
+                        info!("  inputs: ({})", block.inputs.len());
+                        block.inputs.iter().for_each( |input| {
+                            info!("\tcommit: {}", input);
+                        })
                     }
                 }
                 Ok(Err(err)) => {
@@ -102,7 +106,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             match result {
                 Ok(Ok(txns)) => {
                     if all_txns.len() != txns.len() {
-                        info!("Unconfirmed transactions ({})", txns.len());
+                        info!("unconfirmed transactions ({})", txns.len());
 
                         all_txns = txns;
                         all_txns.iter().enumerate().for_each(|(i, txn)| {
