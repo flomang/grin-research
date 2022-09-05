@@ -1,11 +1,13 @@
 use clap::Parser;
 use grin_api::foreign_rpc::foreign_rpc;
 use grin_pool::types::PoolEntry;
+use grin_util::ToHex;
 use log::{debug, info, warn};
 use std::net::SocketAddr;
-//use std::sync::mpsc;
+use std::sync::{Arc, Mutex};
 //use std::time::Duration;
 use api::{rpc, rpc_async};
+use std::collections::HashSet;
 use std::{thread, time};
 
 #[derive(Clone, Parser, Debug)]
@@ -30,10 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     let grin_addr: SocketAddr = args.grin_api_addr.parse().unwrap();
     let grin_url = format!("http://{}/v2/foreign", grin_addr);
-
-    //let (tx, rx) = mpsc::channel();
-    //let tx1 = tx.clone();
-    //let args1 = args.clone();
+    let unconfirmed_inputs = Arc::new(Mutex::new(HashSet::new()));
 
     let grin_version = rpc_async(&grin_url, &foreign_rpc::get_version().unwrap())
         .await
@@ -47,7 +46,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     info!("grin api: {:?}", grin_version);
 
-    let grin_url_copy = grin_url.clone();
+    // needed in first thread
+    let unconfirmed_inputs_clone = Arc::clone(&unconfirmed_inputs);
+    let grin_url_clone = grin_url.clone();
+
     // block tip thread
     let handle1 = thread::spawn(move || {
         let mut current_height = 0;
@@ -56,7 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         loop {
             debug!("block tip thread");
 
-            let result = rpc(&grin_url_copy, &foreign_rpc::get_tip().unwrap());
+            let result = rpc(&grin_url_clone, &foreign_rpc::get_tip().unwrap());
 
             match result {
                 Ok(Ok(grin_tip)) => {
@@ -64,7 +66,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         current_height = grin_tip.height;
 
                         let block = rpc(
-                            &grin_url_copy,
+                            &grin_url_clone,
                             &foreign_rpc::get_block(Some(current_height), None, None).unwrap(),
                         )
                         .unwrap()
@@ -73,8 +75,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let emission = block.header.height * 60 + 60;
                         info!("new block: {}, supply: {}", block.header.height, emission);
                         info!("  inputs: ({})", block.inputs.len());
-                        block.inputs.iter().for_each( |input| {
-                            info!("\tcommit: {}", input);
+
+                        block.inputs.iter().for_each(|input| {
+                            let mut uncommitted = unconfirmed_inputs_clone.lock().unwrap();
+                            if uncommitted.contains(input) {
+                                uncommitted.remove(input);
+                                info!("\tcommit removed: {}", input);
+                            }
                         })
                     }
                 }
@@ -110,24 +117,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                         all_txns = txns;
                         all_txns.iter().enumerate().for_each(|(i, txn)| {
-                            let inputs = txn.tx.body.inputs.len();
-                            let outputs = txn.tx.body.outputs.len();
+                            let inputs_num = txn.tx.body.inputs.len();
+                            let outputs_num = txn.tx.body.outputs.len();
                             let kernels = txn.tx.body.kernels.len();
 
-                            info!("  trans #{}", i+1);
+                            info!("  trans #{}", i + 1);
                             info!("\tat: {}", txn.tx_at);
                             info!("\tsrc: {:?}", txn.src);
                             info!("\tkernels: {:?}", kernels);
 
-                            info!("\tinputs: {:?}", inputs);
-                            match &txn.tx.body.inputs {
-                                grin_core::core::transaction::Inputs::FeaturesAndCommit(vec) => vec.iter().for_each( |f| info!("\t  commit: {:?}", f.commitment())),
-                                grin_core::core::transaction::Inputs::CommitOnly(vec) => vec.iter().for_each( |f| info!("\t  commit: {:?}", f.commitment())),
-                            }
+                            let inputs: Vec<String> = match &txn.tx.body.inputs {
+                                grin_core::core::transaction::Inputs::FeaturesAndCommit(vec) => {
+                                    vec.iter().map(|f| f.commitment().to_hex()).collect()
+                                }
+                                grin_core::core::transaction::Inputs::CommitOnly(vec) => {
+                                    vec.iter().map(|f| f.commitment().to_hex()).collect()
+                                }
+                            };
 
-                            info!("\toutputs: {:?}", outputs);
-                            txn.tx.body.outputs.iter().for_each( |output| {
-                                info!("\t  output: {:?}", output.identifier.commitment());
+                            info!("\tinputs: {:?}", inputs_num);
+                            inputs.iter().for_each(|input | {
+                                 let mut uncommitted = unconfirmed_inputs.lock().unwrap();
+                                 uncommitted.insert(input.to_owned());
+
+                                info!("\t  commit: {}", input);
+                            });
+
+                            info!("\toutputs: {:?}", outputs_num);
+                            txn.tx.body.outputs.iter().for_each(|output| {
+                                info!("\t  commit: {:?}", output.identifier.commitment().to_hex());
                             });
 
                             //info!("\ttx: {:#?}", txn.tx);
