@@ -58,6 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         loop {
             debug!("block tip thread");
 
+            // retrieve grin block tip
             let result = rpc(&grin_url_clone, &foreign_rpc::get_tip().unwrap());
 
             match result {
@@ -65,6 +66,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     if current_height < grin_tip.height {
                         current_height = grin_tip.height;
 
+                        // read block at height
                         let block = rpc(
                             &grin_url_clone,
                             &foreign_rpc::get_block(Some(current_height), None, None).unwrap(),
@@ -74,6 +76,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                         let emission = block.header.height * 60 + 60;
 
+                        // does block have inputs?
                         if block.inputs.len() > 0 {
                             info!("new block: {}, supply: {}, inputs: {}", block.header.height, emission, block.inputs.len());
 
@@ -81,7 +84,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 let mut uncommitted = unconfirmed_inputs_clone.lock().unwrap();
                                 if uncommitted.contains(input) {
                                     uncommitted.remove(input);
-                                    info!("\tcommit removed: {}", input);
+                                    info!("\tconfirmed input: {}", input);
                                 }
                             })
                         } else {
@@ -121,7 +124,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                         all_txns = txns;
                         all_txns.iter().enumerate().for_each(|(i, txn)| {
-                            let outputs_num = txn.tx.body.outputs.len();
                             let kernels = txn.tx.body.kernels.len();
 
                             info!("  trans #{}", i + 1);
@@ -138,17 +140,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 }
                             };
 
+                            let outputs = txn.tx.body.outputs.iter().map(|output| {
+                                output.identifier.commitment().to_hex()
+                            });
+
                             info!("\tinputs: {:?}", inputs.len());
                             inputs.iter().for_each(|input| {
                                 let mut uncommitted = unconfirmed_inputs.lock().unwrap();
                                 uncommitted.insert(input.to_owned());
 
-                                info!("\t  commit: {}", input);
+                                info!("\t  unconfirmed: {}", input);
                             });
 
-                            info!("\toutputs: {:?}", outputs_num);
-                            txn.tx.body.outputs.iter().for_each(|output| {
-                                info!("\t  commit: {:?}", output.identifier.commitment().to_hex());
+                            info!("\toutputs: {:?}", outputs.len());
+                            outputs.for_each(|output| {
+                                info!("\t  unconfirmed: {}", output);
                             });
 
                             //info!("\ttx: {:#?}", txn.tx);
