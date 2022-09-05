@@ -73,16 +73,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .unwrap();
 
                         let emission = block.header.height * 60 + 60;
-                        info!("new block: {}, supply: {}", block.header.height, emission);
-                        info!("  inputs: ({})", block.inputs.len());
 
-                        block.inputs.iter().for_each(|input| {
-                            let mut uncommitted = unconfirmed_inputs_clone.lock().unwrap();
-                            if uncommitted.contains(input) {
-                                uncommitted.remove(input);
-                                info!("\tcommit removed: {}", input);
-                            }
-                        })
+                        if block.inputs.len() > 0 {
+                            info!("new block: {}, supply: {}, inputs: {}", block.header.height, emission, block.inputs.len());
+
+                            block.inputs.iter().for_each(|input| {
+                                let mut uncommitted = unconfirmed_inputs_clone.lock().unwrap();
+                                if uncommitted.contains(input) {
+                                    uncommitted.remove(input);
+                                    info!("\tcommit removed: {}", input);
+                                }
+                            })
+                        } else {
+                            info!("empty block: {}, supply: {}", block.header.height, emission);
+                        }
                     }
                 }
                 Ok(Err(err)) => {
@@ -113,11 +117,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             match result {
                 Ok(Ok(txns)) => {
                     if all_txns.len() != txns.len() {
-                        info!("unconfirmed transactions ({})", txns.len());
+                        info!("unconfirmed transactions {}", txns.len());
 
                         all_txns = txns;
                         all_txns.iter().enumerate().for_each(|(i, txn)| {
-                            let inputs_num = txn.tx.body.inputs.len();
                             let outputs_num = txn.tx.body.outputs.len();
                             let kernels = txn.tx.body.kernels.len();
 
@@ -135,10 +138,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 }
                             };
 
-                            info!("\tinputs: {:?}", inputs_num);
-                            inputs.iter().for_each(|input | {
-                                 let mut uncommitted = unconfirmed_inputs.lock().unwrap();
-                                 uncommitted.insert(input.to_owned());
+                            info!("\tinputs: {:?}", inputs.len());
+                            inputs.iter().for_each(|input| {
+                                let mut uncommitted = unconfirmed_inputs.lock().unwrap();
+                                uncommitted.insert(input.to_owned());
 
                                 info!("\t  commit: {}", input);
                             });
