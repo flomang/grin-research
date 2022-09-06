@@ -4,24 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-actix = "0.13.0"
-actix-rt = "2.7.0"
-actix-web = "4.1.0"
-actix-web-actors = "4.1.0"
-dotenv = "0.15"
 easy-jsonrpc-mw = "0.5.4"
-futures = "0.3"
-log = "0.4.16"
-pretty_env_logger = "0.4.0"
 reqwest = { version = "0.11.11", features = ["blocking", "json"] }
 serde = "1"
 serde_json = "1"
-tokio = { version = "1.20.1", features = ["full"] }
-
-# grin_api = { path = "../../grin/api" } 
-# grin_pool = { path = "../../grin/pool" }
-# grin_core = { path = "../../grin/core" }
-# grin_util = { path = "../../grin/util" }
-# clap = { version = "3.2.17", features = ["derive", "env"] }
-#grin_api = { git = "https://github.com/flomang/grin.git" } 
-#grin_pool = "5.1.2"
