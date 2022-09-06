@@ -6,7 +6,7 @@ use log::{debug, info, warn};
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 //use std::time::Duration;
-use api::{rpc, rpc_async};
+use jsonrpc_client::{rpc, rpc_async};
 use std::collections::HashSet;
 use std::{thread, time};
 
