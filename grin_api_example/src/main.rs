@@ -2,6 +2,7 @@ use clap::Parser;
 use grin_api::foreign_rpc::foreign_rpc;
 use grin_pool::types::PoolEntry;
 use grin_util::ToHex;
+use grin_core::core::transaction::Inputs::{FeaturesAndCommit, CommitOnly};
 use log::{debug, info, warn};
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
@@ -132,10 +133,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             info!("\tkernels: {:?}", kernels);
 
                             let inputs: Vec<String> = match &txn.tx.body.inputs {
-                                grin_core::core::transaction::Inputs::FeaturesAndCommit(vec) => {
+                                FeaturesAndCommit(vec) => {
                                     vec.iter().map(|f| f.commitment().to_hex()).collect()
                                 }
-                                grin_core::core::transaction::Inputs::CommitOnly(vec) => {
+                                CommitOnly(vec) => {
                                     vec.iter().map(|f| f.commitment().to_hex()).collect()
                                 }
                             };
