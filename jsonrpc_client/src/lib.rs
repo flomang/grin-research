@@ -23,6 +23,18 @@ pub async fn rpc_async<R: Deserialize<'static>>(
     Ok(tracker.get_return(&mut response)?)
 }
 
+pub async fn rpc_async_secure<R: Deserialize<'static>>(
+    url: &str,
+    method: &BoundMethod<'_, R>,
+    user: String,
+    pass: String,
+) -> Result<R, RpcErr> {
+    let (request, tracker) = method.call();
+    let json_response = post_async_secure(url, &request.as_request(), user, pass).await?;
+    let mut response = Response::from_json_response(json_response)?;
+    Ok(tracker.get_return(&mut response)?)
+}
+
 fn post(url: &str, body: &Value) -> Result<Value, reqwest::Error> {
     let client = reqwest::blocking::Client::new();
     client
@@ -38,6 +50,21 @@ async fn post_async(url: &str, body: &Value) -> Result<Value, reqwest::Error> {
     let response = client
         .post(url)
         .json(body)
+        .send()
+        .await?;
+
+    let json_response = response.error_for_status()?.json::<Value>().await?;
+
+    Ok(json_response)
+}
+
+async fn post_async_secure(url: &str, body: &Value, user: String, pass: String) -> Result<Value, reqwest::Error> {
+    let client = Client::new();
+
+    let response = client
+        .post(url)
+        .json(body)
+        .basic_auth(user,Some(pass))
         .send()
         .await?;
 
